@@ -1,0 +1,626 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🖨️ JSPrintManager Test - Client-Side Printing</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+
+        .container {
+            background: white;
+            border-radius: 16px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            max-width: 600px;
+            width: 100%;
+            padding: 40px;
+        }
+
+        header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+
+        h1 {
+            font-size: 32px;
+            color: #333;
+            margin-bottom: 8px;
+        }
+
+        .subtitle {
+            color: #666;
+            font-size: 14px;
+        }
+
+        .status-card {
+            background: #f0f0f0;
+            border-left: 4px solid #999;
+            padding: 16px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            font-size: 14px;
+            display: none;
+        }
+
+        .status-card.show { display: block; }
+        .status-card.loading { background: #cce5ff; border-left-color: #0056b3; }
+        .status-card.loading::before { content: "⏳ "; }
+        .status-card.success { background: #d4edda; border-left-color: #28a745; color: #155724; }
+        .status-card.success::before { content: "✅ "; font-weight: bold; }
+        .status-card.error { background: #f8d7da; border-left-color: #dc3545; color: #721c24; }
+        .status-card.error::before { content: "❌ "; font-weight: bold; }
+        .status-card.warning { background: #fff3cd; border-left-color: #ffc107; color: #856404; }
+        .status-card.warning::before { content: "⚠️ "; }
+
+        .section {
+            margin-bottom: 25px;
+        }
+
+        .section-title {
+            font-weight: 600;
+            color: #333;
+            margin-bottom: 12px;
+            font-size: 15px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .form-group {
+            margin-bottom: 16px;
+        }
+
+        label {
+            display: block;
+            font-weight: 500;
+            color: #444;
+            margin-bottom: 6px;
+            font-size: 13px;
+        }
+
+        input[type="text"],
+        input[type="number"],
+        select {
+            width: 100%;
+            padding: 10px 12px;
+            border: 2px solid #ddd;
+            border-radius: 6px;
+            font-size: 14px;
+            transition: border-color 0.3s;
+            font-family: inherit;
+        }
+
+        input[type="text"]:focus,
+        input[type="number"]:focus,
+        select:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+
+        .button-group {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+            margin: 20px 0;
+        }
+
+        button {
+            padding: 12px 16px;
+            border: none;
+            border-radius: 6px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+        }
+
+        button:hover:not(:disabled) {
+            transform: translateY(-2px);
+        }
+
+        button:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+
+        .btn-primary {
+            background: #667eea;
+            color: white;
+            grid-column: 1 / -1;
+        }
+
+        .btn-primary:hover:not(:disabled) {
+            background: #5568d3;
+            box-shadow: 0 10px 20px rgba(102, 126, 234, 0.3);
+        }
+
+        .btn-secondary {
+            background: #e8f4f8;
+            color: #0084b0;
+            border: 2px solid #b3d9e8;
+        }
+
+        .btn-secondary:hover:not(:disabled) {
+            background: #d4ecf5;
+            border-color: #667eea;
+        }
+
+        .printers-list {
+            background: #f9f9f9;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            max-height: 200px;
+            overflow-y: auto;
+        }
+
+        .printer-item {
+            padding: 12px;
+            border-bottom: 1px solid #eee;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .printer-item:last-child {
+            border-bottom: none;
+        }
+
+        .printer-item:hover {
+            background: #e8f4f8;
+        }
+
+        .printer-item.selected {
+            background: #667eea;
+            color: white;
+        }
+
+        .printer-item.selected::before {
+            content: "✓";
+            font-weight: bold;
+        }
+
+        .printer-icon {
+            font-size: 18px;
+        }
+
+        .empty-list {
+            padding: 16px;
+            text-align: center;
+            color: #999;
+        }
+
+        .info-box {
+            background: #e8f4f8;
+            border: 1px solid #b3d9e8;
+            border-radius: 6px;
+            padding: 12px;
+            margin-bottom: 20px;
+            font-size: 13px;
+            color: #0084b0;
+            line-height: 1.5;
+        }
+
+        .code-box {
+            background: #f5f5f5;
+            border-left: 3px solid #667eea;
+            padding: 12px;
+            margin-top: 10px;
+            border-radius: 4px;
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+            overflow-x: auto;
+            line-height: 1.4;
+        }
+
+        .spinner {
+            display: inline-block;
+            width: 12px;
+            height: 12px;
+            border: 2px solid rgba(0, 0, 0, 0.2);
+            border-top-color: currentColor;
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        .divider {
+            height: 1px;
+            background: #eee;
+            margin: 20px 0;
+        }
+
+        .debug-section {
+            background: #f9f9f9;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            padding: 12px;
+            margin-top: 15px;
+        }
+
+        .debug-title {
+            font-weight: 600;
+            font-size: 12px;
+            color: #666;
+            margin-bottom: 8px;
+            text-transform: uppercase;
+        }
+
+        .debug-item {
+            font-size: 12px;
+            font-family: monospace;
+            color: #444;
+            margin: 4px 0;
+        }
+
+        .debug-item strong {
+            color: #667eea;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- Header -->
+        <header>
+            <h1>🖨️ Client-Side Printing</h1>
+            <p class="subtitle">Test JSPrintManager (JSPM) for local printer access</p>
+        </header>
+
+        <!-- Status Card -->
+        <div id="statusCard" class="status-card"></div>
+
+        <!-- Installation Info -->
+        <div class="info-box">
+            <strong>First Time?</strong><br>
+            Download & install JSPrintManager: <a href="https://neodynamic.com/downloads/jsprintmanager" target="_blank" style="color: #0084b0; text-decoration: underline;">https://neodynamic.com/downloads/jsprintmanager</a><br>
+            After install, refresh this page and printers should auto-detect.
+        </div>
+
+        <!-- Connection Status -->
+        <div class="section">
+            <div class="section-title">🔌 Connection Status</div>
+            <div class="debug-section">
+                <div class="debug-title">JSPM Status</div>
+                <div class="debug-item"><strong>Connected:</strong> <span id="connectionStatus">Checking...</span></div>
+                <div class="debug-item"><strong>JSPM Version:</strong> <span id="jspmVersion">Unknown</span></div>
+                <div class="debug-item"><strong>Browser:</strong> <span id="browserInfo">-</span></div>
+            </div>
+        </div>
+
+        <!-- Printer Detection -->
+        <div class="section">
+            <div class="section-title">📱 Available Printers</div>
+            <button class="btn-secondary" onclick="detectPrinters()">
+                <span class="spinner"></span> Detect Printers
+            </button>
+            <div id="printersList" class="printers-list" style="margin-top: 12px; display: none;">
+                <div class="empty-list">Click "Detect Printers" to find available printers</div>
+            </div>
+        </div>
+
+        <!-- TSPL Generation -->
+        <div class="section">
+            <div class="section-title">📄 TSPL Code Generation</div>
+            
+            <div class="form-group">
+                <label for="productName">Product Name</label>
+                <input type="text" id="productName" placeholder="e.g., Galaxy S24 Ultra" value="Galaxy S24 Ultra">
+            </div>
+
+            <div class="form-group">
+                <label for="brand">Brand</label>
+                <input type="text" id="brand" placeholder="e.g., Samsung" value="Samsung">
+            </div>
+
+            <div class="form-group">
+                <label for="barcode">Barcode Value (SKU)</label>
+                <input type="text" id="barcode" placeholder="e.g., 8806094769895" value="8806094769895">
+            </div>
+
+            <div class="form-group">
+                <label for="price">Price (₹)</label>
+                <input type="number" id="price" placeholder="e.g., 89999" value="89999" min="0" step="0.01">
+            </div>
+
+            <div class="form-group">
+                <label for="quantity">Quantity to Print</label>
+                <input type="number" id="quantity" placeholder="1" value="1" min="1" max="999">
+            </div>
+
+            <button class="btn-secondary" onclick="previewTSPL()">
+                👁️ Preview TSPL Code
+            </button>
+        </div>
+
+        <!-- TSPL Preview -->
+        <div id="tsplPreview" style="display: none;">
+            <div class="divider"></div>
+            <div class="section-title">TSPL Code Preview</div>
+            <div class="code-box" id="tsplCode"></div>
+        </div>
+
+        <!-- Print Control -->
+        <div class="section">
+            <div class="section-title">🖨️ Print Control</div>
+            <div class="button-group">
+                <button class="btn-primary" onclick="printLabel()">
+                    🖨️ Send to Printer
+                </button>
+                <button class="btn-secondary" onclick="clearForm()">
+                    🔄 Reset
+                </button>
+            </div>
+        </div>
+
+        <!-- Debug Info -->
+        <div class="section">
+            <div class="debug-section">
+                <div class="debug-title">📊 Debug Information</div>
+                <div class="debug-item"><strong>Selected Printer:</strong> <span id="selectedPrinter">None</span></div>
+                <div class="debug-item"><strong>JSPM Library:</strong> <span id="libraryStatus">-</span></div>
+                <div class="debug-item"><strong>Page URL:</strong> <span id="pageUrl" style="word-break: break-all;">-</span></div>
+                <div class="debug-item"><strong>Timestamp:</strong> <span id="timestamp">-</span></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Local wrapper that loads JSPrintManager.js from local paths -->
+    <script src="/public/js/printer-client.js"></script>
+
+    <script>
+        // ═══════════════════════════════════════════════════════════════
+        // STATE & CONFIGURATION
+        // ═══════════════════════════════════════════════════════════════
+
+        let selectedPrinter = null;
+        let currentTspl = null;
+        let isConnected = false;
+
+        // ═══════════════════════════════════════════════════════════════
+        // INITIALIZATION
+        // ═══════════════════════════════════════════════════════════════
+
+        async function initializeApp() {
+            console.log('🚀 Initializing application...');
+
+            // Update browser info
+            document.getElementById('browserInfo').textContent = 
+                navigator.userAgent.split(' ').slice(-2).join(' ');
+            document.getElementById('pageUrl').textContent = 
+                window.location.href;
+            document.getElementById('timestamp').textContent = 
+                new Date().toLocaleString();
+
+            // Connect via PrinterClient wrapper.
+            try {
+                console.log('🔌 Connecting to JSPrintManager service...');
+                const ok = await PrinterClient.init();
+
+                if (ok) {
+                    document.getElementById('libraryStatus').textContent = '✅ Loaded';
+                    document.getElementById('jspmVersion').textContent =
+                        (window.JSPM && window.JSPM.JSPrintManager ? 'Detected' : 'Unknown');
+                    document.getElementById('connectionStatus').textContent = '✅ Connected';
+                    isConnected = true;
+                    setTimeout(() => detectPrinters(), 500);
+                } else {
+                    document.getElementById('libraryStatus').textContent = '❌ Not Loaded';
+                    document.getElementById('connectionStatus').textContent = '❌ Not Connected';
+                    showStatus('error',
+                        'Could not connect to JSPrintManager.\n\n' +
+                        'Fix:\n' +
+                        '1. Open this page with HTTP: http://127.0.0.1:8000/public/jspm-test-demo.html\n' +
+                        '2. Install JSPrintManager app\n' +
+                        '3. Loader now auto-tries: https://jsprintmanager.azurewebsites.net/scripts/JSPrintManager.js\n' +
+                        '4. Optional local copy: /public/vendor/jspm/JSPrintManager.js\n' +
+                        '5. Start service: Start-Service JSPrintManager'
+                    );
+                }
+            } catch (err) {
+                document.getElementById('libraryStatus').textContent = '❌ Not Loaded';
+                document.getElementById('connectionStatus').textContent = '❌ Error: ' + err.message;
+                showStatus('error', 'Failed to connect: ' + err.message);
+                console.error(err);
+            }
+        }
+
+        function waitForConnection(timeout) {
+            return new Promise((resolve) => {
+                setTimeout(() => resolve(true), timeout);
+            });
+        }
+
+        // ═══════════════════════════════════════════════════════════════
+        // PRINTER DETECTION
+        // ═══════════════════════════════════════════════════════════════
+
+        async function detectPrinters() {
+            if (!isConnected) {
+                showStatus('error', 'Not connected to JSPrintManager');
+                return;
+            }
+
+            showStatus('loading', 'Detecting printers...');
+
+            try {
+                const printers = await PrinterClient.getAvailablePrinters();
+                if (!printers || printers.length === 0) {
+                    showStatus('warning', 'No printers found. Check printer installation.');
+                    return;
+                }
+
+                displayPrinters(printers);
+                showStatus('success', `Found ${printers.length} printer(s)`);
+            } catch (err) {
+                showStatus('error', 'Error detecting printers: ' + err.message);
+            }
+        }
+
+        function displayPrinters(printers) {
+            const list = document.getElementById('printersList');
+            list.style.display = 'block';
+            list.innerHTML = '';
+
+            printers.forEach((printer, index) => {
+                const item = document.createElement('div');
+                item.className = 'printer-item';
+                if (index === 0) item.classList.add('selected');
+
+                item.innerHTML = `<span class="printer-icon">🖨️</span><span>${escapeHtml(printer.name)}</span>`;
+                item.onclick = () => {
+                    selectPrinter(printer.name, item);
+                };
+
+                list.appendChild(item);
+
+                if (index === 0) {
+                    selectPrinter(printer.name, item);
+                }
+            });
+        }
+
+        function selectPrinter(printerName, element) {
+            selectedPrinter = printerName;
+            PrinterClient.selectPrinter(printerName);
+            document.getElementById('selectedPrinter').textContent = printerName;
+
+            document.querySelectorAll('.printer-item').forEach(el => {
+                el.classList.remove('selected');
+            });
+            element.closest('.printer-item')?.classList.add('selected');
+
+            showStatus('success', `Printer selected: ${printerName}`);
+        }
+
+        // ═══════════════════════════════════════════════════════════════
+        // TSPL GENERATION
+        // ═══════════════════════════════════════════════════════════════
+
+        function generateTSPL() {
+            const name = document.getElementById('productName').value || 'ITEM';
+            const brand = document.getElementById('brand').value || 'BRAND';
+            const barcode = document.getElementById('barcode').value || '000000000000';
+            const price = document.getElementById('price').value || '0.00';
+            const quantity = parseInt(document.getElementById('quantity').value) || 1;
+
+            // Build TSPL (simplified for demo)
+            const lines = [
+                'SIZE 35 mm,25 mm',
+                'GAP 2 mm,0',
+                'DIRECTION 1,0',
+                'REFERENCE 0,0',
+                'OFFSET 0 mm',
+                'CLS',
+                `TEXT 10,20,"2",0,1,1,"${escapeForTspl(name)}"`,
+                `TEXT 10,50,"1",0,1,1,"${escapeForTspl(brand)}"`,
+                `BARCODE 30,80,"128",80,0,0,2,3,"${escapeForTspl(barcode)}"`,
+                `TEXT 10,180,"2",0,1,1,"₹${price}"`,
+                `PRINT ${quantity},1`
+            ];
+
+            return lines.join('\r\n') + '\r\n';
+        }
+
+        function previewTSPL() {
+            try {
+                currentTspl = generateTSPL();
+                document.getElementById('tsplCode').textContent = currentTspl;
+                document.getElementById('tsplPreview').style.display = 'block';
+                showStatus('success', 'TSPL code generated');
+            } catch (err) {
+                showStatus('error', 'Error generating TSPL: ' + err.message);
+            }
+        }
+
+        // ═══════════════════════════════════════════════════════════════
+        // PRINTING
+        // ═══════════════════════════════════════════════════════════════
+
+        async function printLabel() {
+            if (!selectedPrinter) {
+                showStatus('error', 'Please select a printer first');
+                return;
+            }
+
+            if (!currentTspl) {
+                showStatus('warning', 'Generate TSPL code first by clicking "Preview"');
+                return;
+            }
+
+            showStatus('loading', 'Sending print job...');
+
+            try {
+                const result = await PrinterClient.reconnect();
+                if (!result) {
+                    throw new Error('Could not connect to JSPrintManager service.');
+                }
+
+                // Send locally generated TSPL to selected printer.
+                const cpj = new window.JSPM.ClientPrintJob();
+                cpj.clientPrinter = new window.JSPM.InstalledPrinter(selectedPrinter);
+                cpj.printerCommands = currentTspl;
+                cpj.sendToClient();
+
+                showStatus('success', 'Print job sent successfully! Check your printer.');
+            } catch (err) {
+                showStatus('error', 'Error: ' + err.message);
+            }
+        }
+
+        // ═══════════════════════════════════════════════════════════════
+        // UI UTILITIES
+        // ═══════════════════════════════════════════════════════════════
+
+        function showStatus(type, message) {
+            const card = document.getElementById('statusCard');
+            card.className = `status-card show ${type}`;
+            card.textContent = message;
+        }
+
+        function clearForm() {
+            document.getElementById('productName').value = 'Galaxy S24 Ultra';
+            document.getElementById('brand').value = 'Samsung';
+            document.getElementById('barcode').value = '8806094769895';
+            document.getElementById('price').value = '89999';
+            document.getElementById('quantity').value = '1';
+            document.getElementById('tsplPreview').style.display = 'none';
+            showStatus('success', 'Form reset');
+        }
+
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        function escapeForTspl(text) {
+            return text.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
+        }
+
+        // ═══════════════════════════════════════════════════════════════
+        // PAGE LOAD
+        // ═══════════════════════════════════════════════════════════════
+
+        window.addEventListener('load', initializeApp);
+    </script>
+</body>
+</html>
